@@ -205,15 +205,15 @@ syscall_handler (struct intr_frame *f)
   {
     case 3:
       if(!get_user_data(&args[2], f->esp+12, 4))
-        sys_exit(1, NULL, NULL);
+        sys_exit(1, 0, 0);
 
     case 2:
       if(!get_user_data(&args[1], f->esp+8, 4))
-        sys_exit(1, NULL, NULL);
+        sys_exit(1, 0, 0);
 
     case 1:
       if(!get_user_data(&args[0], f->esp+4, 4))
-        sys_exit(1, NULL, NULL);
+        sys_exit(1, 0, 0);
   }
   f->eax = sc->func(args[0], args[1], args[2]);
   return;
