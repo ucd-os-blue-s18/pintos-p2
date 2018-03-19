@@ -156,6 +156,15 @@ page_fault (struct intr_frame *f)
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
-  kill (f);
+  if(user)
+  {
+    kill (f);
+  }
+  // Page faults in kernel shouldn't kill the thread - see manual p.27
+  else
+  {
+    f->eip = (void*)f->eax;
+    f->eax = 0xffffffff;
+  }
 }
 
