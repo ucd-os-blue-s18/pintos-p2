@@ -17,31 +17,58 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+struct arg
+{
+  char *value;
+  struct list_elem elem;
+};
+struct process
+{
+  char *name;
+  struct list args;
+};
 /* Starts a new thread running a user program loaded from
-   FILENAME.  The new thread may be scheduled (and may even exit)
+   ARGS.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute (const char *file_name) 
+process_execute (const char *args) 
 {
-  char *fn_copy;
+  char *args_copy;
   tid_t tid;
 
-  /* Make a copy of FILE_NAME.
+  struct process *p = malloc(sizeof(struct process));
+  list_init(&p->args);
+
+  /* Make a copy of ARGS.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  args_copy = palloc_get_page (0);
+  if (args_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (args_copy, args, PGSIZE);
+
+  // Tokenize args to get filename and arguments
+  char *token, *save_ptr;
+
+  for (token = strtok_r (args_copy, " ", &save_ptr); token != NULL;
+      token = strtok_r (NULL, " ", &save_ptr))
+  {
+    struct arg *a = malloc(sizeof(struct arg));
+    a->value = token;
+    list_push_back(&p->args, &a->elem);
+  }
+
+  p->name = (list_entry(list_front(&p->args), struct arg, elem))->value;
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (p->name, PRI_DEFAULT, start_process, p);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (args_copy); 
   return tid;
 }
 
