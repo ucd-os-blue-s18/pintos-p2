@@ -479,7 +479,7 @@ setup_stack (void **esp, struct process *p)
         int i = 0;
         void **arg_pointers = malloc(sizeof(void*) * argc);
         
-        // Copy arguments
+        // Push arguments
         struct list_elem *e;
         for (e = list_begin (&p->args); e != list_end (&p->args);
              e = list_next (e))
@@ -498,7 +498,7 @@ setup_stack (void **esp, struct process *p)
         }
         
         // Re-align stack pointer
-        stack = (char*)ROUND_DOWN((int)kpage + PGSIZE - 1, 4);
+        stack = (char*)ROUND_DOWN((int)stack, sizeof(char*));
 
         // Push null pointer sentinel (though this should already
         // be zeroed anyway)
@@ -519,7 +519,7 @@ setup_stack (void **esp, struct process *p)
 
         // Push argc value
         stack -= sizeof(int);
-        memset(stack, argc, sizeof(int));
+        memcpy(stack, &argc, sizeof(int));
         
         // Push fake return address
         stack -= sizeof(void*);
@@ -528,6 +528,8 @@ setup_stack (void **esp, struct process *p)
         // Set user-space stack pointer based on
         // number of bytes pushed to stack
         *esp = PHYS_BASE - (stack_bottom - stack);
+        printf("number of bytes pushed: %d\n", stack_bottom - stack);
+        
       }
       else
         palloc_free_page (kpage);
