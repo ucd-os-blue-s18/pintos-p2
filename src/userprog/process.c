@@ -474,7 +474,7 @@ setup_stack (void **esp, struct process *p)
         // Get address of bottom of page, then word align it
         // TODO: should this address be adjusted by one?
         char *stack = (char*)ROUND_DOWN((int)kpage + PGSIZE, sizeof(char*));
-        char *stack_bottom = kpage + PGSIZE;
+        char *stack_bottom = (char*)(kpage + PGSIZE);
         int argc = list_size(&p->args);
         int i = 0;
         void **arg_pointers = malloc(sizeof(void*) * argc);
@@ -493,7 +493,7 @@ setup_stack (void **esp, struct process *p)
           strlcpy(stack, a->value, arg_size);
 
           // Preserve addresses, converted to user space,
-          // of args
+          // of args on the stack
           arg_pointers[i] = PHYS_BASE - (stack_bottom - stack);
           i++;
         }
@@ -514,7 +514,7 @@ setup_stack (void **esp, struct process *p)
         }
 
         // Push argv address, converted to user space
-        char **argv_start = (char**)PHYS_BASE - (stack_bottom - stack);
+        char **argv_start = PHYS_BASE - (stack_bottom - stack);
         stack -= sizeof(char**);
         memcpy(stack, &argv_start, sizeof(char**));
 
@@ -529,7 +529,6 @@ setup_stack (void **esp, struct process *p)
         // Set user-space stack pointer based on
         // number of bytes pushed to stack
         *esp = PHYS_BASE - (stack_bottom - stack);
-        hex_dump(0, stack, (stack_bottom - stack), true);
       }
       else
         palloc_free_page (kpage);

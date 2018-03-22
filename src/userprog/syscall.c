@@ -92,7 +92,7 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   UNUSED int status = arg0;
 
   // TODO: actually print process name
-  printf("%s: exit(%d)\n", "TODO", status);
+  printf("%s: exit(%d)\n", thread_current()->name, status);
 
   // when running with USERPROG defined, thread_exit will also call
   // process_exit 
