@@ -492,8 +492,9 @@ setup_stack (void **esp, struct process *p)
           stack -= arg_size;
           strlcpy(stack, a->value, arg_size);
 
-          // Preserve addresses of args
-          arg_pointers[i] = stack;
+          // Preserve addresses, converted to user space,
+          // of args
+          arg_pointers[i] = PHYS_BASE - (stack_bottom - stack);
           i++;
         }
         
@@ -509,13 +510,13 @@ setup_stack (void **esp, struct process *p)
         for(int i = 0; i < argc; i++)
         {
           stack -= sizeof(char*);
-          memcpy(stack, arg_pointers[i], sizeof(char*));
+          memcpy(stack, &arg_pointers[i], sizeof(char*));
         }
 
-        // Push argv address
-        char **argv_start = (char**)stack;
+        // Push argv address, converted to user space
+        char **argv_start = (char**)PHYS_BASE - (stack_bottom - stack);
         stack -= sizeof(char**);
-        memcpy(stack, argv_start, sizeof(char**));
+        memcpy(stack, &argv_start, sizeof(char**));
 
         // Push argc value
         stack -= sizeof(int);
@@ -528,8 +529,7 @@ setup_stack (void **esp, struct process *p)
         // Set user-space stack pointer based on
         // number of bytes pushed to stack
         *esp = PHYS_BASE - (stack_bottom - stack);
-        printf("number of bytes pushed: %d\n", stack_bottom - stack);
-        
+        hex_dump(0, stack, (stack_bottom - stack), true);
       }
       else
         palloc_free_page (kpage);
