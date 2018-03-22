@@ -473,8 +473,8 @@ setup_stack (void **esp, struct process *p)
       {
         // Get address of bottom of page, then word align it
         // TODO: should this address be adjusted by one?
-        char *stack = (char*)ROUND_DOWN((int)kpage + PGSIZE - 1, 4);
-        char *stack_bottom = stack;
+        char *stack = (char*)ROUND_DOWN((int)kpage + PGSIZE, sizeof(char*));
+        char *stack_bottom = kpage + PGSIZE;
         int argc = list_size(&p->args);
         int i = 0;
         void **arg_pointers = malloc(sizeof(void*) * argc);
@@ -502,8 +502,8 @@ setup_stack (void **esp, struct process *p)
 
         // Push null pointer sentinel (though this should already
         // be zeroed anyway)
-        stack -= 4;
-        memset(stack, 0, 4);
+        stack -= sizeof(void*);
+        memset(stack, 0, sizeof(void*));
 
         // Push arg pointers
         for(int i = 0; i < argc; i++)
@@ -527,7 +527,7 @@ setup_stack (void **esp, struct process *p)
 
         // Set user-space stack pointer based on
         // number of bytes pushed to stack
-        *esp = PHYS_BASE - (stack_bottom - stack + 1);
+        *esp = PHYS_BASE - (stack_bottom - stack);
       }
       else
         palloc_free_page (kpage);
