@@ -6,6 +6,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
+#include "threads/synch.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -91,7 +92,6 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 {
   UNUSED int status = arg0;
 
-  // TODO: actually print process name
   printf("%s: exit(%d)\n", thread_current()->name, status);
 
   // when running with USERPROG defined, thread_exit will also call
@@ -196,7 +196,7 @@ syscall_handler (struct intr_frame *f)
   int args[3] = {0,0,0};
 
   if(!get_user_data(&syscall_number, f->esp, 4))
-    thread_exit();
+    sys_exit(-1, 0, 0);
 
   // fallthrough here is intentional
   // TODO: pagefaults may require more handling than this
@@ -205,15 +205,15 @@ syscall_handler (struct intr_frame *f)
   {
     case 3:
       if(!get_user_data(&args[2], f->esp+12, 4))
-        sys_exit(1, 0, 0);
+        sys_exit(-1, 0, 0);
 
     case 2:
       if(!get_user_data(&args[1], f->esp+8, 4))
-        sys_exit(1, 0, 0);
+        sys_exit(-1, 0, 0);
 
     case 1:
       if(!get_user_data(&args[0], f->esp+4, 4))
-        sys_exit(1, 0, 0);
+        sys_exit(-1, 0, 0);
   }
   f->eax = sc->func(args[0], args[1], args[2]);
   return;

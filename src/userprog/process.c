@@ -18,20 +18,12 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
-
-struct arg
-{
-  char *value;
-  struct list_elem elem;
-};
-struct process
-{
-  char *name;
-  struct list args;
-};
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (struct process *p, void (**eip) (void), void **esp);
+
+static struct semaphore child_thread_exit;
 
 /* Starts a new thread running a user program loaded from
    ARGS.  The new thread may be scheduled (and may even exit)
@@ -46,6 +38,10 @@ process_execute (const char *args)
   // TODO: when and where does this need to be freed?
   struct process *p = malloc(sizeof(struct process));
   list_init(&p->args);
+
+  //TODO: test code, remove or modify this
+  sema_init(&child_thread_exit, 0);
+  p->on_exit = &child_thread_exit;
 
   /* Make a copy of ARGS.
      Otherwise there's a race between the caller and load(). */
@@ -118,8 +114,9 @@ start_process (void *aux)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  // TODO: this isn't a real implementation
-  while(1){}
+  // TODO: test code, change or remove
+  // still needs to deal with exit status
+  sema_down(&child_thread_exit);
   return -1;
 }
 

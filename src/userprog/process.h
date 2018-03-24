@@ -3,6 +3,18 @@
 
 #include "threads/thread.h"
 
+struct arg
+{
+  char *value;
+  struct list_elem elem;
+};
+struct process
+{
+  char *name;
+  struct list args;
+  struct semaphore *on_exit;
+};
+
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);
 void process_exit (void);

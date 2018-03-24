@@ -181,6 +181,7 @@ thread_create (const char *name, int priority,
 
   /* Initialize thread. */
   init_thread (t, name, priority);
+  t->on_exit = ((struct process *)aux)->on_exit;
   tid = t->tid = allocate_tid ();
 
   /* Stack frame for kernel_thread(). */
@@ -282,6 +283,7 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
 
+  sema_up(thread_current()->on_exit);
 #ifdef USERPROG
   process_exit ();
 #endif
