@@ -12,7 +12,7 @@ struct process
 {
   char *name;
   struct list args;
-  struct semaphore *on_exit;
+  struct parent_child_synch *pc_synch;
 };
 
 tid_t process_execute (const char *file_name);

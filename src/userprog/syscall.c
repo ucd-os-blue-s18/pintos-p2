@@ -1,12 +1,13 @@
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "devices/shutdown.h"
 #include "threads/synch.h"
+#include "devices/shutdown.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -90,7 +91,8 @@ static int sys_halt(int arg0 UNUSED, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 {
-  UNUSED int status = arg0;
+  // TODO: how do we return this?
+  int status = arg0;
 
   printf("%s: exit(%d)\n", thread_current()->name, status);
 
@@ -102,9 +104,9 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_exec (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED const char *file = (const char*)arg0;
+  const char *args = (const char*)arg0;
 
-  return 0; 
+  return process_execute(args);
 }
 
 static int sys_wait (int arg0, int arg1 UNUSED, int arg2 UNUSED)

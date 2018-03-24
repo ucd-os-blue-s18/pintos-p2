@@ -23,8 +23,6 @@
 static thread_func start_process NO_RETURN;
 static bool load (struct process *p, void (**eip) (void), void **esp);
 
-static struct semaphore child_thread_exit;
-
 /* Starts a new thread running a user program loaded from
    ARGS.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -35,13 +33,17 @@ process_execute (const char *args)
   char *args_copy;
   tid_t tid;
 
+  // Allocate and initialize data to pass to child process
   // TODO: when and where does this need to be freed?
   struct process *p = malloc(sizeof(struct process));
   list_init(&p->args);
 
-  //TODO: test code, remove or modify this
-  sema_init(&child_thread_exit, 0);
-  p->on_exit = &child_thread_exit;
+  // Allocate and initialize new parent-child synch data 
+  //TODO: when/where to free?
+  struct parent_child_synch *new_pc_synch = malloc(sizeof(struct parent_child_synch));
+  sema_init(&new_pc_synch->on_load, 0);
+  sema_init(&new_pc_synch->on_exit, 0);
+  p->pc_synch = new_pc_synch;
 
   /* Make a copy of ARGS.
      Otherwise there's a race between the caller and load(). */
@@ -63,11 +65,24 @@ process_execute (const char *args)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (p->name, PRI_DEFAULT, start_process, p);
+  if (tid != TID_ERROR)
+  {
+    sema_down(&new_pc_synch->on_load);
+    if(!new_pc_synch->load_success)
+      tid = TID_ERROR;
+    else
+      list_push_back
+        (&thread_current()->active_child_processes,
+         &new_pc_synch->elem);
+  }
+
   if (tid == TID_ERROR)
   {
     palloc_free_page (args_copy); 
     free(p);
+    free(new_pc_synch);
   }
+  
   return tid;
 }
 
