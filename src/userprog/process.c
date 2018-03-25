@@ -23,8 +23,6 @@
 static thread_func start_process NO_RETURN;
 static bool load (struct process *p, void (**eip) (void), void **esp);
 
-static struct semaphore child_thread_exit;
-
 /* Starts a new thread running a user program loaded from
    ARGS.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -35,13 +33,14 @@ process_execute (const char *args)
   char *args_copy;
   tid_t tid;
 
+  // Allocate and initialize data to pass to child process
   // TODO: when and where does this need to be freed?
+  // if the parent exits before children, they might lose
+  // access to semaphores and such
   struct process *p = malloc(sizeof(struct process));
   list_init(&p->args);
-
-  //TODO: test code, remove or modify this
-  sema_init(&child_thread_exit, 0);
-  p->on_exit = &child_thread_exit;
+  sema_init(&p->on_load, 0);
+  sema_init(&p->on_exit, 0);
 
   /* Make a copy of ARGS.
      Otherwise there's a race between the caller and load(). */
@@ -51,6 +50,7 @@ process_execute (const char *args)
   strlcpy (args_copy, args, PGSIZE);
 
   // Tokenize args to get filename and arguments
+  // TODO: get rid of args_copy somewhere
   char *token, *save_ptr;
   for (token = strtok_r (args_copy, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr))
@@ -63,11 +63,23 @@ process_execute (const char *args)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (p->name, PRI_DEFAULT, start_process, p);
-  if (tid == TID_ERROR)
+  if (tid != TID_ERROR)
   {
-    palloc_free_page (args_copy); 
-    free(p);
+    sema_down(&p->on_load);
+    if(!p->load_success)
+      tid = TID_ERROR;
+    else
+    {
+      p->tid = tid;
+      list_push_front
+        (&(thread_current()->active_child_processes),
+         &p->elem);
+    }
   }
+
+  if (tid == TID_ERROR)
+    free(p);
+  
   return tid;
 }
 
@@ -88,9 +100,15 @@ start_process (void *aux)
   success = load (p, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (p->name);
   if (!success) 
+  {
+    p->load_success = false;
+    sema_up(&p->on_load);
     thread_exit ();
+  }
+
+  p->load_success = true;
+  sema_up(&p->on_load);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -112,11 +130,25 @@ start_process (void *aux)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  // TODO: test code, change or remove
-  // still needs to deal with exit status
-  sema_down(&child_thread_exit);
+  struct list_elem *e;
+  struct list *active_child_processes = &thread_current()->active_child_processes;
+
+  for (e = list_begin (active_child_processes); e != list_end (active_child_processes);
+        e = list_next (e))
+    {
+      struct process *p = list_entry (e, struct process, elem);
+      if(p->tid == child_tid)
+      {
+        sema_down(&p->on_exit);
+        list_remove(&p->elem);
+        int exit_status = p->exit_status;
+        free(p);
+        return exit_status;
+      }
+    }
+
   return -1;
 }
 

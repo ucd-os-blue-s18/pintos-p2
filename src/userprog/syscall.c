@@ -1,12 +1,13 @@
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "devices/shutdown.h"
 #include "threads/synch.h"
+#include "devices/shutdown.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -90,8 +91,9 @@ static int sys_halt(int arg0 UNUSED, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 {
-  UNUSED int status = arg0;
+  int status = arg0;
 
+  thread_current()->p->exit_status = status;
   printf("%s: exit(%d)\n", thread_current()->name, status);
 
   // when running with USERPROG defined, thread_exit will also call
@@ -102,16 +104,21 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_exec (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED const char *file = (const char*)arg0;
+  const char *args = (const char*)arg0;
 
-  return 0; 
+  for(int i = 0; verify_user(args+i); i++)
+  {
+    if(args[i] == '\0')
+      return process_execute(args);
+  }
+  return sys_exit(-1, 0, 0);
 }
 
 static int sys_wait (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED pid_t pid = arg0;
+  pid_t pid = arg0;
 
-  return 0; 
+  return process_wait(pid); 
 }
 
 static int sys_create (int arg0, int arg1, int arg2 UNUSED)

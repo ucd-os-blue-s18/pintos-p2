@@ -2,17 +2,30 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
+#include "threads/synch.h"
 
 struct arg
 {
   char *value;
   struct list_elem elem;
 };
+
 struct process
 {
-  char *name;
-  struct list args;
-  struct semaphore *on_exit;
+    // Argument passing
+    char *name;
+    struct list args;
+
+    // Parent-child synchronization
+    tid_t tid;
+
+    struct semaphore on_load;
+    int load_success;
+
+    struct semaphore on_exit;
+    int exit_status;
+
+    struct list_elem elem;
 };
 
 tid_t process_execute (const char *file_name);
