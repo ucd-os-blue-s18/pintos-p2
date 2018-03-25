@@ -105,7 +105,6 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 static int sys_exec (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
   const char *args = (const char*)arg0;
-  printf("sys_exec with args: %s\n", args);
 
   return process_execute(args);
 }

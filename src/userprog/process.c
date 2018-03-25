@@ -70,6 +70,7 @@ process_execute (const char *args)
       tid = TID_ERROR;
     else
     {
+      p->tid = tid;
       list_push_front
         (&(thread_current()->active_child_processes),
          &p->elem);
