@@ -105,9 +105,13 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 static int sys_exec (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
   const char *args = (const char*)arg0;
-  if(!verify_user(args))
-    sys_exit(-1, 0, 0);
-  return process_execute(args);
+
+  for(int i = 0; verify_user(args+i); i++)
+  {
+    if(args[i] == '\0')
+      return process_execute(args);
+  }
+  return sys_exit(-1, 0, 0);
 }
 
 static int sys_wait (int arg0, int arg1 UNUSED, int arg2 UNUSED)
