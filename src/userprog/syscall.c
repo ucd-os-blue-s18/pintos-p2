@@ -8,13 +8,19 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "devices/shutdown.h"
+#include "filesys/filesys.h"
 
 static void syscall_handler (struct intr_frame *);
+
+// Lock required for making calls into filesys. Concurrency
+// is not supported for those calls
+static struct lock filesys_lock;
 
 void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init(&filesys_lock);
 }
 
 // User memory access functions
@@ -47,6 +53,7 @@ static inline bool put_user (uint8_t *udst, uint8_t byte) {
 }
 
 // Wrapper around get_user to get SIZE number of bytes
+// TODO: augment this to be able to get and set user data
 static bool get_user_data (void *dst, const void *usrc, size_t size) 
 {
   uint8_t *dst_byte = (uint8_t *)dst;
@@ -62,9 +69,22 @@ static bool get_user_data (void *dst, const void *usrc, size_t size)
   return true;
 }
 
+// verifies that all bytes of a string pointed
+// to by S are in valid user address space
+static bool verify_string(const char* s)
+{
+  for(int i = 0; verify_user(s+i); i++)
+  {
+    if(s[i] == '\0')
+      return true;
+  }
+  return false;
+}
+
 // System calls
 // TODO: remove all the UNUSED descriptors as these are implemented.
 //       they're only used to clear out all the compiler warnings
+
 static int sys_write (int arg0, int arg1, int arg2)
 {
   int fd = arg0;
@@ -96,9 +116,11 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   thread_current()->p->exit_status = status;
   printf("%s: exit(%d)\n", thread_current()->name, status);
 
-  // when running with USERPROG defined, thread_exit will also call
-  // process_exit 
-  // TODO: deal with freeing resources such as locks
+  // when running with USERPROG defined, thread_exit will also call process_exit 
+  // TODO: does anything else need to be freed? (namely, that args_copy crap)
+  if(lock_held_by_current_thread(&filesys_lock))
+    lock_release(&filesys_lock);
+
   thread_exit();
 }
 
@@ -106,12 +128,10 @@ static int sys_exec (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
   const char *args = (const char*)arg0;
 
-  for(int i = 0; verify_user(args+i); i++)
-  {
-    if(args[i] == '\0')
-      return process_execute(args);
-  }
-  return sys_exit(-1, 0, 0);
+  if(!verify_string(args))
+    sys_exit(-1, 0, 0);
+  
+  return process_execute(args);
 }
 
 static int sys_wait (int arg0, int arg1 UNUSED, int arg2 UNUSED)
@@ -123,10 +143,18 @@ static int sys_wait (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_create (int arg0, int arg1, int arg2 UNUSED)
 { 
-  UNUSED const char *file = (const char*)arg0;
-  UNUSED unsigned initial_size = (unsigned)arg1;
+  const char *file = (const char*)arg0;
+  unsigned initial_size = (unsigned)arg1;
+  bool success = false;
 
-  return 0; 
+  if(file == NULL || !verify_string(file))
+    sys_exit(-1, 0, 0);
+
+  lock_acquire(&filesys_lock);
+  success = filesys_create(file, initial_size);
+  lock_release(&filesys_lock);
+
+  return success; 
 }
 
 static int sys_remove (int arg0, int arg1 UNUSED, int arg2 UNUSED)
