@@ -105,15 +105,16 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 static int sys_exec (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
   const char *args = (const char*)arg0;
-
+  if(!verify_user(args))
+    sys_exit(-1, 0, 0);
   return process_execute(args);
 }
 
 static int sys_wait (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED pid_t pid = arg0;
+  pid_t pid = arg0;
 
-  return 0; 
+  return process_wait(pid); 
 }
 
 static int sys_create (int arg0, int arg1, int arg2 UNUSED)
