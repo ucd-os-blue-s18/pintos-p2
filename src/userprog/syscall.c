@@ -91,9 +91,9 @@ static int sys_halt(int arg0 UNUSED, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 {
-  // TODO: how do we return this?
   int status = arg0;
 
+  thread_current()->p->exit_status = status;
   printf("%s: exit(%d)\n", thread_current()->name, status);
 
   // when running with USERPROG defined, thread_exit will also call
@@ -105,6 +105,7 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 static int sys_exec (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
   const char *args = (const char*)arg0;
+  printf("sys_exec with args: %s\n", args);
 
   return process_execute(args);
 }
