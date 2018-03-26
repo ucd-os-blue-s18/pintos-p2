@@ -41,6 +41,7 @@ syscall_init (void)
   lock_init(&filesys_lock);
 }
 
+
 // User memory access functions
 
 /* Returns true if UADDR is a valid, mapped user address,
@@ -76,6 +77,9 @@ static inline bool put_user (uint8_t *udst, uint8_t byte) {
 static bool access_user_data 
 (void *dst, const void *src, size_t size, enum user_access_type uat) 
 {
+  if(dst == NULL || src == NULL)
+    return false;
+
   uint8_t *dst_byte = (uint8_t *)dst;
   uint8_t *src_byte = (uint8_t *)src;
 
@@ -131,7 +135,7 @@ static struct open_file* get_open_file (int fd)
   return NULL;
 }
 
-static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
+int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 {
   int status = arg0;
 
@@ -154,7 +158,7 @@ static int sys_write (int arg0, int arg1, int arg2)
   int bytes_written = 0;
   char *kernel_buffer;
 
-  if(!verify_user(buffer))
+  if(buffer == NULL || !verify_user(buffer))
     sys_exit(-1, 0, 0);
 
   // writing to stdout
@@ -260,13 +264,14 @@ static int sys_filesize (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_read (int arg0, int arg1, int arg2)
 { 
+  printf("in sys_read\n");
   int fd = arg0;
   void *buffer = (void*)arg1;
   unsigned length = (unsigned)arg2;
   char *kernel_buffer;
   int bytes_read = 0;
 
-  if(!verify_user(buffer))
+  if(buffer == NULL || !verify_user(buffer))
     sys_exit(-1, 0, 0);
   
   if(fd == 0)

@@ -4,5 +4,6 @@
 typedef int pid_t;
 
 void syscall_init (void);
+int sys_exit(int, int, int);
 
 #endif /* userprog/syscall.h */
