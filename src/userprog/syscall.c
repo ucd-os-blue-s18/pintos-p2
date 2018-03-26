@@ -224,8 +224,17 @@ static int sys_create (int arg0, int arg1, int arg2 UNUSED)
 
 static int sys_remove (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED const char *file = (const char *)arg0;
+  const char *file = (const char *)arg0;
+  bool success = false;
+  
+  if(file == NULL || !verify_string(file))
+    sys_exit(-1, 0, 0);
 
+  lock_acquire(&filesys_lock);
+  success = filesys_remove(file);
+  lock_release(&filesys_lock);
+
+  return success; 
   return 0;
 }
 
