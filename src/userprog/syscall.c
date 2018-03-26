@@ -113,8 +113,6 @@ static bool verify_string(const char* s)
 }
 
 // System calls
-// TODO: remove all the (local) UNUSED descriptors as these are implemented.
-//       they're only used to clear out all the compiler warnings
 
 // get an open_file if it's in the thread's fd list
 // else, return 0
@@ -143,6 +141,15 @@ int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   // TODO: does anything else need to be freed? (namely, that args_copy crap)
   if(lock_held_by_current_thread(&filesys_lock))
     lock_release(&filesys_lock);
+  
+  // Free open files
+  struct list *file_descriptors = &thread_current()->file_descriptors;
+  while (!list_empty (file_descriptors))
+  {
+    struct list_elem *e = list_pop_front (file_descriptors);
+    struct open_file *of = list_entry (e, struct open_file, elem);
+    free(of);
+  }
 
   thread_exit();
 }
