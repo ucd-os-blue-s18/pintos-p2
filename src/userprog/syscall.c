@@ -7,6 +7,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
+#include "threads/malloc.h"
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
 
@@ -15,6 +16,16 @@ static void syscall_handler (struct intr_frame *);
 // Lock required for making calls into filesys. Concurrency
 // is not supported for those calls
 static struct lock filesys_lock;
+
+// TODO: this is just going to keep increasing, which would ultimately
+// break on integer overflow, though that probably won't happen
+static int fd = 2;
+struct open_file
+{
+  int fd;
+  struct file* f;
+  struct list_elem elem;
+};
 
 void
 syscall_init (void) 
@@ -82,7 +93,7 @@ static bool verify_string(const char* s)
 }
 
 // System calls
-// TODO: remove all the UNUSED descriptors as these are implemented.
+// TODO: remove all the (local) UNUSED descriptors as these are implemented.
 //       they're only used to clear out all the compiler warnings
 
 static int sys_write (int arg0, int arg1, int arg2)
@@ -166,9 +177,23 @@ static int sys_remove (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_open (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED const char *file = (const char *)arg0;
+  const char *file = (const char *)arg0;
 
-  return 0; 
+  if(file == NULL || !verify_string(file))
+    sys_exit(-1, 0, 0);
+
+  struct file *f;
+  lock_acquire(&filesys_lock);
+  if(!(f = filesys_open(file)))
+    return -1;
+  lock_release(&filesys_lock);
+
+  struct open_file *of = malloc(sizeof(struct open_file));
+  of->f = f;
+  of->fd = fd++;
+  list_push_back(&thread_current()->file_descriptors, &of->elem);
+
+  return of->fd; 
 }
 
 static int sys_filesize (int arg0, int arg1 UNUSED, int arg2 UNUSED)
@@ -202,6 +227,8 @@ static int sys_tell (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   return 0; 
 }
 
+// TODO: this should remove the open_file from the thread's
+// file_descriptors list, I think
 static int sys_close (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
   UNUSED int fd = arg0;

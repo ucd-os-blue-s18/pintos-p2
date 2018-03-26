@@ -3,3 +3,4 @@ bochsrc.txt
 bochsout.txt
 
 pintos-p2-tests.sh
+regression-testing.sh

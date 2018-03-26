@@ -98,6 +98,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct process *p;
     struct list active_child_processes;
+    struct list file_descriptors;
 #endif
 
     /* Owned by thread.c. */
