@@ -300,15 +300,20 @@ static int sys_read (int arg0, int arg1, int arg2)
 
 static int sys_seek (int arg0, int arg1, int arg2 UNUSED)
 { 
-  UNUSED int fd = arg0;
-  UNUSED unsigned position = (unsigned)arg1;
-  
+  int fd = arg0;
+  unsigned position = (unsigned)arg1;
+  struct open_file *of = get_open_file(fd);
+
+  file_seek(of->f, position);
   return 0; 
 }
 
 static int sys_tell (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED int fd = arg0;
+  int fd = arg0;
+  struct open_file *of = get_open_file(fd);
+
+  file_tell(of->f);
   
   return 0; 
 }
