@@ -113,8 +113,6 @@ static bool verify_string(const char* s)
 }
 
 // System calls
-// TODO: remove all the (local) UNUSED descriptors as these are implemented.
-//       they're only used to clear out all the compiler warnings
 
 // get an open_file if it's in the thread's fd list
 // else, return 0
@@ -140,9 +138,37 @@ int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   printf("%s: exit(%d)\n", thread_current()->name, status);
 
   // when running with USERPROG defined, thread_exit will also call process_exit 
-  // TODO: does anything else need to be freed? (namely, that args_copy crap)
   if(lock_held_by_current_thread(&filesys_lock))
     lock_release(&filesys_lock);
+  
+  // Free open files
+  struct list *file_descriptors = &thread_current()->file_descriptors;
+  while (!list_empty (file_descriptors))
+  {
+    struct list_elem *e = list_pop_front (file_descriptors);
+    struct open_file *of = list_entry (e, struct open_file, elem);
+    lock_acquire(&filesys_lock);
+    file_close(of->f);
+    lock_release(&filesys_lock);
+    free(of);
+  }
+
+  // Inform children that parent has exited
+  struct list *active_child_processes = &thread_current()->active_child_processes;
+  while (!list_empty (active_child_processes))
+  {
+    struct list_elem *e = list_pop_front (active_child_processes);
+    struct process *p = list_entry (e, struct process, elem);
+    p->parent_alive = false;
+  }
+
+  file_close (thread_current()->p->f);
+
+  bool parent_alive = thread_current()->p->parent_alive;
+  if(parent_alive)
+    sema_up(&(thread_current()->p->on_exit));
+  else 
+    free(thread_current()->p);
 
   thread_exit();
 }
@@ -367,7 +393,6 @@ syscall_handler (struct intr_frame *f)
     sys_exit(-1, 0, 0);
 
   // fallthrough here is intentional
-  // TODO: pagefaults may require more handling than this
   struct syscall *sc = &syscall_array[syscall_number];
   switch(sc->argc)
   {

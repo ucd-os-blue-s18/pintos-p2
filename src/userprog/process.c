@@ -34,13 +34,11 @@ process_execute (const char *args)
   tid_t tid;
 
   // Allocate and initialize data to pass to child process
-  // TODO: when and where does this need to be freed?
-  // if the parent exits before children, they might lose
-  // access to semaphores and such
   struct process *p = malloc(sizeof(struct process));
   list_init(&p->args);
   sema_init(&p->on_load, 0);
   sema_init(&p->on_exit, 0);
+  p->parent_alive = true;
 
   /* Make a copy of ARGS.
      Otherwise there's a race between the caller and load(). */
@@ -50,7 +48,6 @@ process_execute (const char *args)
   strlcpy (args_copy, args, PGSIZE);
 
   // Tokenize args to get filename and arguments
-  // TODO: get rid of args_copy somewhere
   char *token, *save_ptr;
   for (token = strtok_r (args_copy, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr))
@@ -61,7 +58,7 @@ process_execute (const char *args)
   }
   p->name = (list_entry(list_back(&p->args), struct arg, elem))->value;
 
-  /* Create a new thread to execute FILE_NAME. */
+  /* Create a new thread to execute p->name. */
   tid = thread_create (p->name, PRI_DEFAULT, start_process, p);
   if (tid != TID_ERROR)
   {
@@ -77,6 +74,7 @@ process_execute (const char *args)
     }
   }
 
+  palloc_free_page(p->name);
   if (tid == TID_ERROR)
     free(p);
   
@@ -125,10 +123,7 @@ start_process (void *aux)
    exception), returns -1.  If TID is invalid or if it was not a
    child of the calling process, or if process_wait() has already
    been successfully called for the given TID, returns -1
-   immediately, without waiting.
-
-   This function will be implemented in problem 2-2.  For now, it
-   does nothing. */
+   immediately, without waiting. */
 int
 process_wait (tid_t child_tid) 
 {
@@ -502,7 +497,6 @@ setup_stack (void **esp, struct process *p)
       if (success)
       {
         // Get address of bottom of page, then word align it
-        // TODO: should this address be adjusted by one?
         char *stack = (char*)ROUND_DOWN((int)kpage + PGSIZE, sizeof(char*));
         char *stack_bottom = (char*)(kpage + PGSIZE);
         int argc = list_size(&p->args);
@@ -563,6 +557,7 @@ setup_stack (void **esp, struct process *p)
       else
         palloc_free_page (kpage);
     }
+
   return success;
 }
 

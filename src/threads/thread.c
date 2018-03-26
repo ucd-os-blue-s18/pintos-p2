@@ -14,6 +14,7 @@
 #ifdef USERPROG
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "threads/malloc.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -287,9 +288,7 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-  sema_up(&(thread_current()->p->on_exit));
   process_exit ();
-  file_close (thread_current()->p->f);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
