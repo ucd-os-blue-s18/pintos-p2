@@ -131,30 +131,6 @@ static struct open_file* get_open_file (int fd)
   return NULL;
 }
 
-static int sys_write (int arg0, int arg1, int arg2)
-{
-  int fd = arg0;
-  const void *buffer = (const void*)arg1;
-  unsigned length = (unsigned)arg2;
-
-  // writing to stdout
-  if(fd == 1)
-  {
-    putbuf(buffer, length);
-    return length;
-  }
-  // TODO: handle other fds
-  else
-  {
-    return 0;
-  }
-}
-
-static int sys_halt(int arg0 UNUSED, int arg1 UNUSED, int arg2 UNUSED)
-{
-  shutdown_power_off();
-}
-
 static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 {
   int status = arg0;
@@ -168,6 +144,48 @@ static int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
     lock_release(&filesys_lock);
 
   thread_exit();
+}
+
+static int sys_write (int arg0, int arg1, int arg2)
+{
+  int fd = arg0;
+  const void *buffer = (const void*)arg1;
+  unsigned length = (unsigned)arg2;
+  int bytes_written = 0;
+  char *kernel_buffer;
+
+  if(!verify_user(buffer))
+    sys_exit(-1, 0, 0);
+
+  // writing to stdout
+  if(fd == 1)
+  {
+    putbuf(buffer, length);
+    bytes_written = length;
+  }
+  else
+  {
+    struct open_file *of = get_open_file(fd);
+    if(!of)
+      return -1;
+
+    kernel_buffer = malloc(length);
+    if(!access_user_data(kernel_buffer, buffer, length, USER_READ))
+    {
+      free(kernel_buffer);
+      sys_exit(-1, 0, 0);
+    }
+    lock_acquire(&filesys_lock);
+    bytes_written = file_write(of->f, kernel_buffer, length);
+    lock_release(&filesys_lock);
+  }
+
+  return bytes_written;
+}
+
+static int sys_halt(int arg0 UNUSED, int arg1 UNUSED, int arg2 UNUSED)
+{
+  shutdown_power_off();
 }
 
 static int sys_exec (int arg0, int arg1 UNUSED, int arg2 UNUSED)
@@ -262,9 +280,7 @@ static int sys_read (int arg0, int arg1, int arg2)
   {
     struct open_file *of = get_open_file(fd);
     if(!of)
-    {
       return -1;
-    }
 
     kernel_buffer = malloc(length);
     lock_acquire(&filesys_lock);
