@@ -138,7 +138,7 @@ int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   printf("%s: exit(%d)\n", thread_current()->name, status);
 
   // when running with USERPROG defined, thread_exit will also call process_exit 
-  // TODO: does anything else need to be freed? (namely, that args_copy crap)
+  // TODO: does anything else need to be freed? 
   if(lock_held_by_current_thread(&filesys_lock))
     lock_release(&filesys_lock);
   
@@ -149,6 +149,15 @@ int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
     struct list_elem *e = list_pop_front (file_descriptors);
     struct open_file *of = list_entry (e, struct open_file, elem);
     free(of);
+  }
+
+  // Inform children that parent has exited
+  struct list *active_child_processes = &thread_current()->active_child_processes;
+  while (!list_empty (active_child_processes))
+  {
+    struct list_elem *e = list_pop_front (active_child_processes);
+    struct process *p = list_entry (e, struct process, elem);
+    p->parent_alive = false;
   }
 
   thread_exit();

@@ -21,6 +21,7 @@ struct process
 
     // Parent-child synchronization
     tid_t tid;
+    bool parent_alive;
 
     struct semaphore on_load;
     int load_success;
