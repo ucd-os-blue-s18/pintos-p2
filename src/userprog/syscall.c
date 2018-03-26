@@ -227,13 +227,23 @@ static int sys_tell (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   return 0; 
 }
 
-// TODO: this should remove the open_file from the thread's
-// file_descriptors list, I think
 static int sys_close (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED int fd = arg0;
-  
-  return 0; 
+  int fd = arg0;
+  struct list *file_descriptors = &thread_current()->file_descriptors;
+  struct list_elem *e;
+
+  for (e = list_begin (file_descriptors); e != list_end (file_descriptors);
+        e = list_next (e))
+    {
+      struct open_file *of = list_entry (e, struct open_file, elem);
+      if(of->fd == fd)
+      {
+        list_remove(&of->elem);
+        free(of);
+        return;
+      }
+    }
 }
 
 // Syscall dispatch table
