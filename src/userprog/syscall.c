@@ -9,9 +9,15 @@
 #include "threads/synch.h"
 #include "threads/malloc.h"
 #include "devices/shutdown.h"
+#include "devices/input.h"
 #include "filesys/filesys.h"
 
 static void syscall_handler (struct intr_frame *);
+
+enum user_access_type
+{
+  USER_READ, USER_WRITE
+};
 
 // Lock required for making calls into filesys. Concurrency
 // is not supported for those calls
@@ -63,18 +69,30 @@ static inline bool put_user (uint8_t *udst, uint8_t byte) {
   return eax != 0;
 }
 
-// Wrapper around get_user to get SIZE number of bytes
-// TODO: augment this to be able to get and set user data
-static bool get_user_data (void *dst, const void *usrc, size_t size) 
+// wrapper around user memory access functions
+// reads or writes SIZE number of bytes from/to user space
+// DST and SRC are used with respect to UAT
+static bool access_user_data 
+(void *dst, const void *src, size_t size, enum user_access_type uat) 
 {
   uint8_t *dst_byte = (uint8_t *)dst;
-  uint8_t *usrc_byte = (uint8_t *)usrc;
+  uint8_t *src_byte = (uint8_t *)src;
 
   for (unsigned i=0; i < size; i++)
   {
-    if(!(verify_user(usrc_byte+i) && get_user(dst_byte+i, usrc_byte+i)))
-    {
-      return false;
+    switch (uat){
+      case USER_READ:
+        if(!(verify_user(src_byte+i) && get_user(dst_byte+i, src_byte+i)))
+          return false;
+        break;
+
+      case USER_WRITE:
+        if(!(verify_user(dst_byte+i) && put_user(dst_byte+i, *src_byte+i)))
+          return false;
+        break;
+      
+      default:
+        return false;
     }
   }
   return true;
@@ -241,9 +259,10 @@ static int sys_close (int arg0, int arg1 UNUSED, int arg2 UNUSED)
       {
         list_remove(&of->elem);
         free(of);
-        return;
+        return 0;
       }
     }
+  return 0;
 }
 
 // Syscall dispatch table
@@ -267,7 +286,7 @@ syscall_handler (struct intr_frame *f)
   int syscall_number = 0;
   int args[3] = {0,0,0};
 
-  if(!get_user_data(&syscall_number, f->esp, 4))
+  if(!access_user_data(&syscall_number, f->esp, 4, USER_READ))
     sys_exit(-1, 0, 0);
 
   // fallthrough here is intentional
@@ -276,15 +295,17 @@ syscall_handler (struct intr_frame *f)
   switch(sc->argc)
   {
     case 3:
-      if(!get_user_data(&args[2], f->esp+12, 4))
+      if(!access_user_data(&args[2], f->esp+12, 4, USER_READ))
         sys_exit(-1, 0, 0);
+      __attribute__((fallthrough));
 
     case 2:
-      if(!get_user_data(&args[1], f->esp+8, 4))
+      if(!access_user_data(&args[1], f->esp+8, 4, USER_READ))
         sys_exit(-1, 0, 0);
+      __attribute__((fallthrough));
 
     case 1:
-      if(!get_user_data(&args[0], f->esp+4, 4))
+      if(!access_user_data(&args[0], f->esp+4, 4, USER_READ))
         sys_exit(-1, 0, 0);
   }
   f->eax = sc->func(args[0], args[1], args[2]);
