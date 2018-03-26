@@ -12,6 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #ifdef USERPROG
+#include "filesys/file.h"
 #include "userprog/process.h"
 #endif
 
@@ -288,6 +289,7 @@ thread_exit (void)
 #ifdef USERPROG
   sema_up(&(thread_current()->p->on_exit));
   process_exit ();
+  file_close (thread_current()->p->f);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,

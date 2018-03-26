@@ -12,6 +12,9 @@ struct arg
 
 struct process
 {
+    // Used to prevent writing to executable
+    struct file *f;
+
     // Argument passing
     char *name;
     struct list args;

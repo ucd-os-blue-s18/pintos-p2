@@ -284,11 +284,13 @@ load (struct process *p, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (p->name);
+  p->f = file;
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", p->name);
       goto done; 
     }
+  file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -373,7 +375,6 @@ load (struct process *p, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
   return success;
 }
 
