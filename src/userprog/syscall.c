@@ -11,6 +11,7 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "filesys/filesys.h"
+#include "filesys/file.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -87,7 +88,7 @@ static bool access_user_data
         break;
 
       case USER_WRITE:
-        if(!(verify_user(dst_byte+i) && put_user(dst_byte+i, *src_byte+i)))
+        if(!(verify_user(dst_byte+i) && put_user(dst_byte+i, *(src_byte+i))))
           return false;
         break;
       
@@ -113,6 +114,22 @@ static bool verify_string(const char* s)
 // System calls
 // TODO: remove all the (local) UNUSED descriptors as these are implemented.
 //       they're only used to clear out all the compiler warnings
+
+// get an open_file if it's in the thread's fd list
+// else, return 0
+static struct open_file* get_open_file (int fd)
+{
+  struct list *file_descriptors = &thread_current()->file_descriptors;
+  struct list_elem *e;
+  for (e = list_begin (file_descriptors); e != list_end (file_descriptors);
+        e = list_next (e))
+    {
+      struct open_file *of = list_entry (e, struct open_file, elem);
+      if(of->fd == fd)
+        return of;
+    }
+  return NULL;
+}
 
 static int sys_write (int arg0, int arg1, int arg2)
 {
@@ -216,18 +233,53 @@ static int sys_open (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 
 static int sys_filesize (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
-  UNUSED int fd = arg0;
-  
-  return 0; 
+  int fd = arg0;
+  struct open_file *of = get_open_file(fd);
+  if(!of)
+    return 0;
+  return file_length(of->f);
 }
 
 static int sys_read (int arg0, int arg1, int arg2)
 { 
-  UNUSED int fd = arg0;
-  UNUSED void *buffer = (void*)arg1;
-  UNUSED unsigned length = (unsigned)arg2;
+  int fd = arg0;
+  void *buffer = (void*)arg1;
+  unsigned length = (unsigned)arg2;
+  char *kernel_buffer;
+  int bytes_read = 0;
+
+  if(!verify_user(buffer))
+    sys_exit(-1, 0, 0);
   
-  return 0; 
+  if(fd == 0)
+  {
+    char c = input_getc();
+    bytes_read = 1;
+    if(!access_user_data(buffer, &c, bytes_read, USER_WRITE))
+      sys_exit(-1, 0, 0);
+  }
+  else
+  {
+    struct open_file *of = get_open_file(fd);
+    if(!of)
+    {
+      return -1;
+    }
+
+    kernel_buffer = malloc(length);
+    lock_acquire(&filesys_lock);
+    bytes_read = file_read(of->f, kernel_buffer, length);
+    lock_release(&filesys_lock);
+
+    if(!access_user_data(buffer, kernel_buffer, bytes_read, USER_WRITE))
+    {
+      free(kernel_buffer);
+      sys_exit(-1, 0, 0);
+    }
+    free(kernel_buffer);
+  }
+  
+  return bytes_read; 
 }
 
 static int sys_seek (int arg0, int arg1, int arg2 UNUSED)
@@ -248,20 +300,14 @@ static int sys_tell (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 static int sys_close (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 { 
   int fd = arg0;
-  struct list *file_descriptors = &thread_current()->file_descriptors;
-  struct list_elem *e;
+  struct open_file *of = get_open_file(fd);
 
-  for (e = list_begin (file_descriptors); e != list_end (file_descriptors);
-        e = list_next (e))
-    {
-      struct open_file *of = list_entry (e, struct open_file, elem);
-      if(of->fd == fd)
-      {
-        list_remove(&of->elem);
-        free(of);
-        return 0;
-      }
-    }
+  if(of)
+  {
+    list_remove(&of->elem);
+    free(of);
+  }
+
   return 0;
 }
 
