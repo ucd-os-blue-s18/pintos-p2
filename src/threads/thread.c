@@ -184,8 +184,6 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority, aux);
 
-  // TODO: should this even be initialized here?
-
   tid = t->tid = allocate_tid ();
 
   /* Stack frame for kernel_thread(). */
@@ -470,7 +468,7 @@ init_thread (struct thread *t, const char *name, int priority, void *aux)
   t->magic = THREAD_MAGIC;
   list_init(&t->active_child_processes);
   list_init(&t->file_descriptors);
-  t->p = (struct process *)aux;
+  t->process = (struct process *)aux;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

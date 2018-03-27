@@ -279,7 +279,7 @@ load (struct process *p, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (p->name);
-  p->f = file;
+  p->executable = file;
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", p->name);

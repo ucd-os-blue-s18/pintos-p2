@@ -13,7 +13,7 @@ struct arg
 struct process
 {
     // Used to prevent writing to executable
-    struct file *f;
+    struct file *executable;
 
     // Argument passing
     char *name;

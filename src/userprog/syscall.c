@@ -30,7 +30,7 @@ static int fd = 2;
 struct open_file
 {
   int fd;
-  struct file* f;
+  struct file* file;
   struct list_elem elem;
 };
 
@@ -134,7 +134,7 @@ int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
 {
   int status = arg0;
 
-  thread_current()->p->exit_status = status;
+  thread_current()->process->exit_status = status;
   printf("%s: exit(%d)\n", thread_current()->name, status);
 
   // when running with USERPROG defined, thread_exit will also call process_exit 
@@ -148,7 +148,7 @@ int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
     struct list_elem *e = list_pop_front (file_descriptors);
     struct open_file *of = list_entry (e, struct open_file, elem);
     lock_acquire(&filesys_lock);
-    file_close(of->f);
+    file_close(of->file);
     lock_release(&filesys_lock);
     free(of);
   }
@@ -162,13 +162,13 @@ int sys_exit (int arg0, int arg1 UNUSED, int arg2 UNUSED)
     p->parent_alive = false;
   }
 
-  file_close (thread_current()->p->f);
+  file_close (thread_current()->process->executable);
 
-  bool parent_alive = thread_current()->p->parent_alive;
+  bool parent_alive = thread_current()->process->parent_alive;
   if(parent_alive)
-    sema_up(&(thread_current()->p->on_exit));
+    sema_up(&(thread_current()->process->on_exit));
   else 
-    free(thread_current()->p);
+    free(thread_current()->process);
 
   thread_exit();
 }
@@ -203,7 +203,7 @@ static int sys_write (int arg0, int arg1, int arg2)
       sys_exit(-1, 0, 0);
     }
     lock_acquire(&filesys_lock);
-    bytes_written = file_write(of->f, kernel_buffer, length);
+    bytes_written = file_write(of->file, kernel_buffer, length);
     lock_release(&filesys_lock);
   }
 
@@ -278,7 +278,7 @@ static int sys_open (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   lock_release(&filesys_lock);
 
   struct open_file *of = malloc(sizeof(struct open_file));
-  of->f = f;
+  of->file = f;
   of->fd = fd++;
   list_push_back(&thread_current()->file_descriptors, &of->elem);
 
@@ -291,7 +291,7 @@ static int sys_filesize (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   struct open_file *of = get_open_file(fd);
   if(!of)
     return 0;
-  return file_length(of->f);
+  return file_length(of->file);
 }
 
 static int sys_read (int arg0, int arg1, int arg2)
@@ -320,7 +320,7 @@ static int sys_read (int arg0, int arg1, int arg2)
 
     kernel_buffer = malloc(length);
     lock_acquire(&filesys_lock);
-    bytes_read = file_read(of->f, kernel_buffer, length);
+    bytes_read = file_read(of->file, kernel_buffer, length);
     lock_release(&filesys_lock);
 
     if(!access_user_data(buffer, kernel_buffer, bytes_read, USER_WRITE))
@@ -340,7 +340,7 @@ static int sys_seek (int arg0, int arg1, int arg2 UNUSED)
   unsigned position = (unsigned)arg1;
   struct open_file *of = get_open_file(fd);
 
-  file_seek(of->f, position);
+  file_seek(of->file, position);
   return 0; 
 }
 
@@ -349,7 +349,7 @@ static int sys_tell (int arg0, int arg1 UNUSED, int arg2 UNUSED)
   int fd = arg0;
   struct open_file *of = get_open_file(fd);
 
-  file_tell(of->f);
+  file_tell(of->file);
   
   return 0; 
 }
